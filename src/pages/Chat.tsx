@@ -29,15 +29,57 @@ const Chat = () => {
     setInput("");
     setIsLoading(true);
 
-    // 模拟 AI 响应
-    setTimeout(() => {
-      const aiMessage: Message = {
-        role: "assistant",
-        content: `我理解您的需求："${input}"。这个功能将通过 Lovable AI 实现，可以进行文本生成、图像生成等多种操作。`,
+    try {
+      // 使用 Server-Sent Events (SSE) 连接后端 API
+      const eventSource = new EventSource(`/api/ask?q=${encodeURIComponent(input)}`);
+      let responseContent = "";
+      let aiMessageIndex: number | null = null;
+
+      eventSource.onmessage = (event) => {
+        const data = event.data;
+        
+        if (data === "[END]") {
+          // 响应结束
+          eventSource.close();
+          setIsLoading(false);
+          return;
+        }
+
+        responseContent += data;
+        
+        // 更新或创建 AI 消息
+        if (aiMessageIndex === null) {
+          // 创建新消息
+          const aiMessage: Message = { role: "assistant", content: responseContent };
+          setMessages((prev) => {
+            const newMessages = [...prev, aiMessage];
+            aiMessageIndex = newMessages.length - 1;
+            return newMessages;
+          });
+        } else {
+          // 更新现有消息
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            newMessages[aiMessageIndex] = { 
+              ...newMessages[aiMessageIndex], 
+              content: responseContent 
+            };
+            return newMessages;
+          });
+        }
       };
-      setMessages((prev) => [...prev, aiMessage]);
+
+      eventSource.onerror = (error) => {
+        console.error("SSE Error:", error);
+        eventSource.close();
+        setIsLoading(false);
+        toast.error("与服务器的连接出现错误");
+      };
+    } catch (error) {
+      console.error("Error sending message:", error);
       setIsLoading(false);
-    }, 1500);
+      toast.error("发送消息失败");
+    }
   };
 
   const handleImageGeneration = () => {
