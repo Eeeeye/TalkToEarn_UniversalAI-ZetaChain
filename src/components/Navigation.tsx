@@ -9,18 +9,51 @@ import { ethers } from "ethers";
 
 export const Navigation = () => {
   const location = useLocation();
-  const { provider, isConnected, account, currentChain, currentChainId, connect } = useWeb3();
+  const { provider, isConnected, account, connect } = useWeb3();
   const [copied, setCopied] = useState(false);
   const [zetaBalance, setZetaBalance] = useState<string>('0');
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [currentNetwork, setCurrentNetwork] = useState<string | null>(null);
   
+  // 获取当前网络
+  useEffect(() => {
+    if (!provider || !isConnected) {
+      setCurrentNetwork(null);
+      return;
+    }
+
+    const updateCurrentNetwork = async () => {
+      try {
+        const network = await provider.getNetwork();
+        const chainId = network.chainId.toString();
+        const chain = Object.keys(CHAIN_CONFIGS).find((key) => {
+          const config = CHAIN_CONFIGS[key as any];
+          const configChainId = config.chainId.replace('0x', '');
+          const currentChainIdHex = BigInt(chainId).toString(16);
+          return config.chainId === `0x${currentChainIdHex}` || 
+                 config.chainId === chainId ||
+                 (configChainId && BigInt(`0x${configChainId}`) === BigInt(chainId));
+        });
+
+        if (chain) {
+          setCurrentNetwork(CHAIN_CONFIGS[chain as any].chainName);
+        } else {
+          setCurrentNetwork('未知网络');
+        }
+      } catch (error) {
+        console.error('获取当前网络失败:', error);
+        setCurrentNetwork(null);
+      }
+    };
+
+    updateCurrentNetwork();
+  }, [provider, isConnected]);
+
   // 调试日志
   console.log('📊 Navigation组件状态:')
   console.log('   - isConnected:', isConnected)
   console.log('   - account:', account)
-  console.log('   - currentChain:', currentChain)
-  console.log('   - currentChainId:', currentChainId)
-  console.log('   - CHAIN_CONFIGS:', CHAIN_CONFIGS)
+  console.log('   - currentNetwork:', currentNetwork)
   
   // 连接钱包并强制切换到 ZetaChain
   const handleConnect = async () => {
@@ -86,10 +119,10 @@ export const Navigation = () => {
     }
   };
 
-  // 当用户连接或当前链变化时获取余额
+  // 当用户连接或当前网络变化时获取余额
   useEffect(() => {
     fetchZetaBalance();
-  }, [isConnected, currentChain, account]);
+  }, [isConnected, currentNetwork, account]);
   
   const navItems = [
     { path: "/", label: "首页", icon: LayoutDashboard },
@@ -129,17 +162,17 @@ export const Navigation = () => {
 
           {isConnected && account ? (
             <div className="flex items-center gap-2">
-              {/* 当前链显示 */}
+              {/* 当前网络显示 */}
               <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
                 <span className="text-sm font-medium text-blue-900">
-                  {currentChain ? CHAIN_CONFIGS[currentChain].chainName : '未知链'}
+                  网络: {currentNetwork || '未知网络'}
                 </span>
               </div>
               
               {/* ZETA余额显示 */}
               <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg">
                 <span className="text-sm font-medium text-purple-900">
-                  {isLoadingBalance ? '加载中...' : `${zetaBalance} ZETA`}
+                  {isLoadingBalance ? '加载中...' : `${(parseFloat(zetaBalance) || 0).toFixed(3)} ZETA`}
                 </span>
               </div>
               
