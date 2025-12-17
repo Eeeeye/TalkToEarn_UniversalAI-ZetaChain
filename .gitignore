@@ -35,6 +35,11 @@ node_modules/
 .pnp
 .pnp.js
 
+# Hardhat / Solidity build artifacts
+artifacts/
+cache/
+typechain-types/
+
 # 构建输出
 .next/
 out/
